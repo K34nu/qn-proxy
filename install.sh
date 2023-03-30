@@ -18,12 +18,12 @@ docker pull mariadb:latest
 RANDOM_PASSWORD=$(openssl rand -base64 12)
 echo "Generated random password for zabbix user: ${RANDOM_PASSWORD}"
 
-docker run -d --name mariadb_container \
+docker run -d --name mariadb \
   -e MYSQL_ROOT_PASSWORD=root_password \
   -e MYSQL_DATABASE=zabbix_proxy \
   -e MYSQL_USER=zabbix \
   -e MYSQL_PASSWORD="${RANDOM_PASSWORD}" \
-  mariadb:latest
+  mariadb:10.7
 
 # Download the Zabbix-proxy-mysql container
 echo "Downloading Zabbix-proxy-mysql container..."
