@@ -1,58 +1,50 @@
 #!/bin/sh
 
-# Update the system
-apk update && apk upgrade
+#
+#
+# (c) Qnetix LTD 2023
+#
+#
 
-# Install Zabbix repository
-echo "http://repo.zabbix.com/zabbix/6.0/alpine/v3.14/main" >> /etc/apk/repositories
+# Install Docker
+echo "Installing Docker..."
+apk update && apk add docker
+rc-update add docker boot
+service docker start
+addgroup root docker
+echo "Docker installation completed."
 
-# Add Zabbix public key
-wget https://repo.zabbix.com/zabbix-official-repo.key -O - | apk add --allow-untrusted - gpg
+# Download and start the MariaDB container
+echo "Setting up MariaDB container..."
+docker pull mariadb:latest
+RANDOM_PASSWORD=$(openssl rand -base64 12)
+echo "Generated random password for zabbix user: ${RANDOM_PASSWORD}"
 
-# Install Zabbix proxy, PostgreSQL, and related tools
-apk add zabbix-proxy-pgsql postgresql postgresql-client zabbix-sql-scripts
+docker run -d --name mariadb_container \
+  -e MYSQL_ROOT_PASSWORD=root_password \
+  -e MYSQL_DATABASE=zabbix_proxy \
+  -e MYSQL_USER=zabbix \
+  -e MYSQL_PASSWORD="${RANDOM_PASSWORD}" \
+  mariadb:latest
 
-# Initialize the PostgreSQL database
-mkdir -p /var/lib/postgresql/data
-chown -R postgres:postgres /var/lib/postgresql
-su - postgres -c 'initdb -D /var/lib/postgresql/data'
+# Download the Zabbix-proxy-mysql container
+echo "Downloading Zabbix-proxy-mysql container..."
+docker pull zabbix/zabbix-proxy-mysql:latest
 
-# Start the PostgreSQL service
-rc-update add postgresql default
-rc-service postgresql start
+# Get server address and port from user
+read -p "Please enter the server address: " server_address
+read -p "Please enter the server port: " server_port
 
-# Generate a random database password
-db_password=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 12)
+# Start the Zabbix-proxy-mysql container
+echo "Starting Zabbix-proxy-mysql container..."
+docker run -d --name zabbix_proxy_mysql \
+  --link mariadb_container:mysql \
+  -e DB_SERVER_HOST="mariadb_container" \
+  -e MYSQL_DATABASE="zabbix_proxy" \
+  -e MYSQL_USER="zabbix" \
+  -e MYSQL_PASSWORD="${RANDOM_PASSWORD}" \
+  -e ZBX_SERVER_HOST="${server_address}" \
+  -e ZBX_SERVER_PORT="${server_port}" \
+  zabbix/zabbix-proxy-mysql:latest
 
-# Set up the initial steps on PostgreSQL
-su - postgres -c "createuser zabbix"
-su - postgres -c "createdb -O zabbix zabbix_proxy"
-su - postgres -c "psql -c \"ALTER USER zabbix WITH ENCRYPTED PASSWORD '${db_password}';\""
-
-# Import the Zabbix proxy database schema
-zcat /usr/share/zabbix-sql-scripts/postgresql/proxy.sql.gz | PGPASSWORD=${db_password} su - postgres -c "psql -U zabbix zabbix_proxy"
-
-# Ask the user for a server address and port number
-printf "Enter the Zabbix server address: "
-read server_address
-printf "Enter the Zabbix server port number: "
-read server_port
-
-# Update the zabbix_proxy.conf file
-server_address_port="${server_address}:${server_port}"
-sed -i "s/^Server=.*/Server=${server_address_port}/" /etc/zabbix/zabbix_proxy.conf
-sed -i "s/^DBUser=.*/DBUser=zabbix/" /etc/zabbix/zabbix_proxy.conf
-sed -i "s/^DBPassword=.*/DBPassword=${db_password}/" /etc/zabbix/zabbix_proxy.conf
-sed -i "s/^DBName=.*/DBName=zabbix_proxy/" /etc/zabbix/zabbix_proxy.conf
-
-# Enable and restart the Zabbix proxy service
-rc-update add zabbix-proxy default
-rc-service zabbix-proxy restart
-
-# Unset variables
-unset server_address
-unset server_port
-unset db_password
-unset server_address_port
-
-echo "Zabbix proxy installation and configuration completed."
+echo "Zabbix-proxy-mysql container started successfully."
