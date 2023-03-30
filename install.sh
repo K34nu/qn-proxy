@@ -37,7 +37,7 @@ read -p "Please enter the server port: " server_port
 echo "Starting Zabbix-proxy-mysql container..."
 docker run -d --name zabbix_proxy_mysql \
   --link mariadb_container:mysql \
-  -e DB_SERVER_HOST="mariadb_container" \
+  -e DB_SERVER_HOST="mariadb" \
   -e MYSQL_DATABASE="zabbix_proxy" \
   -e MYSQL_USER="zabbix" \
   -e MYSQL_PASSWORD="${RANDOM_PASSWORD}" \
