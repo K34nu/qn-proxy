@@ -32,7 +32,7 @@ docker run -d --name mariadb \
   -e MYSQL_DATABASE=zabbix_proxy \
   -e MYSQL_USER=zabbix \
   -e MYSQL_PASSWORD="${ZABX_RAND_PASSWD}" \
-  --restart always
+  --restart always \
   mariadb:${DB_VERS}
 
 if [ $? -ne 0 ]; then
@@ -64,7 +64,7 @@ docker run -d --name zproxy \
   -e MYSQL_PASSWORD="${RANDOM_PASSWORD}" \
   -e ZBX_SERVER_HOST="${server_address}" \
   -e ZBX_SERVER_PORT="${server_port}" \
-  --restart always
+  --restart always \
   zabbix/zabbix-proxy-mysql:${PRXY_VERS}
 
 if [ $? -ne 0 ]; then
